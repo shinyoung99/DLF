@@ -58,3 +58,110 @@ dot 언어로 기술한 문자열을 추가하는데 그래프를 굳이 dot 언
 
 복잡한 미분계산에서 시각화 하는 것이 중요한 것인가?
 input과 output을 노드로 보여주는데 그래프가 중요한 것인가?
+
+
+------------------------------------------------------------------------
+
+모든 고차 미분을 자동으로 계산
+2차, 3차 미분...n차 미분까지 자동으로 계산할 수 있도록
+n차 미분까지 자동으로 계산시 고려 사항
+현재의 역전파 구현을 근본적으로 재검토가 필요하다
+현재의 Variable과 Function 클래스 구현에 대한 고찰도 필요하다.
+data와 grad 인스타스 변수는 각각 순전파 계산과 역전파 계산 시 사용한다. 
+data, grad 모두 ndarray 인스턴스를 저장
+
+Function 클래스의 _call_메서드
+순전파 계산(메인 처리)
+input을 받는다. input으로 들어오는 데이터들을 xs에 담아둔다. forward를 호출해서 구체적으로 계산한다.
+
+sin 클래스 코드를 forward 메서드를 진행하면서 _call_메서드가 만들어진다. 
+
+역전파 로직
+Variable 클래스의 backward 구현한다.
+ndarrat 인스턴스가 담겨있는 리스트가 전달된다. 
+순전파는 sin가 실행될 때 계산 그래프 만들어지고, Variable 인스턴스 변수인 data가 채워지고
+역전파는 sin 클래스의 backward 메서드가 불리고 Variable 인스턴스 변수인 grad가 채워짐
+
+고차 미분
+
+계산 연결은 Function 클래스의 _call_메서드에서 만들어진다.
+순전파와 역전파 계산은 Function 클래스를 상속한 클래스의 forward와 backward 메서드로 처리한다
+
+역전파를 계산할 때는 연결이 만들어지지 않는다.
+backward 메서드는 계산만 진행되고 계산과 관련된 아무런 계산 그래프도 만들지 않음 -> ndarray 인스턴스 사용
+
+고차 미분을 자동으로 할 수 있게 만드려면 역전파를 계산할 때도 연결이 만들어 지도록 하면 됨다.
+순전파 계산 연결은 Variable 인스턴스를 사용해서 순전파를 하는 시점에서 연결이 만들어진다. 
+backward()메서드에서 계산 연결이 만들어짐
+미분값(기울기)를 Variable 인스턴스 형태로 유지 
+sin 클래스의 순전파와 역전파 계산 그래프는 Variable 클래스의 grad가 Variable 인스턴스를 참조 
+sin 클래스에서 backward() 메서드 구현시 미분을 계산하는 코드 추가
+
+역전파 -> Variable 인스턴스를 사용하면 해결
+
+패키지 구조 변경
+고차 미분을 할 수 있는 새로운 Variable 클래스를 dezero/core.py에 구현
+
+새로운 dezero의 가장 중요한 변화는 Variable 클래스의 인스턴스 변수인 grad
+기존 grad는 ndarray 인스턴스를 참조 했는데, 새로운 클래스에서는 Variable 인스턴스 참조
+미분값을 자동으로 저장하는 코드 self.grad가 Variable 인스턴스를 담는다.
+
+class Variable:
+    ---
+    def backward(self, retain_grad=False):
+        if self.grad is None:
+            self.grad = Variable(np.ones_like(self.data)) -> 소스 변경 코드
+
+함수 클래스의 역전파 구현
+Mul 클래스의 역전파 수정
+class Mul(Function):
+    ----
+    def backward(self, gy):
+        x0, x1 = self.inputs
+
+        return gy * x1, gy * x0
+
+역전파 활성/비활성 모드
+create_graph 추가 -> 기본값은 False로 설정 -> 2차 미분이 필요하면 True로 설정
+역전파 처리 -> with using_config(...) 에서 수행 
+
+def backward(self, retain_grad=False, create_graph=False):
+------
+.....
+....
+....
+..
+            with using_config('enable_backprop', create_graph):
+                gxs = f.backward(*gys) #메인 backward ******
+
+
+y = backward(create_graph=True) -> 2차 미분 역전파 진행
+gx.backward로 y의 x 미분값 꺼내고  gx에 대한 역전파를 한 번 더 진행
+
+sin 클래스 구현은 backward 메서드 안의 모든 변수가 Variable 인스턴스
+import numpy as np
+from dezero.core import Function
+
+class Sin(Function):
+    def forward(self, x):
+        y = np.sin(x)
+        return y
+
+    def backward(self, gy):
+        x = self.inputs
+        gx = gy * cos(x)
+        retutn gx
+def sin(x)
+    return Sin()(x)
+
+gx = gy*cos(x)에서 cos(x)는 dezero의 cos 함수 -> 곱셈 연산자를 오버로드 해놓았기 때문에 mul 함수 호출
+
+cos 클래스와 함수 구현
+backward 메서드에서 구체적인 계산에서 sin 함수 사용
+
+tanh 함수 순전파에서 -> np.tanh 메서드 이용
+역전파 gy * (1-y * y) 형태로 구현
+재사용 할 수 있도록 dezero.core / function.py에 추가
+for문에서 반복해서 역전파로 고차 미분 계산 -> iters = 0 이면 1차, 1이면 2차 미분
+
+double backprop 활용 용도는 미분이 포함된 식에서 다시 한번 미분 수행
