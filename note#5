@@ -1,0 +1,30 @@
+202184032 안신영
+
+9주차
+Optimizer로 수행하는 매개변수 갱신
+- 경사하강법 사용
+- 매개변수 갱신 작업 모듈화
+구체적인 최적화 기법은 Optimizer 클래스를 상속한 자식 클래스에서 구현함
+update 메서드는 모든 매개변수를 갱신
+전처리는 add_hook 메서드를 사용하여 전처리 수행
+
+SGD 클래스 구현
+- 경사하강법으로 매개변수를 갱신하는 클래스를 구현
+SGD클래스는 Optimizer 클래스 상속
+_init_ 메서드는 학습률을 받아 최기화
+update_one 메서드에서 매개변수 갱신 코드를 구현함
+
+class SGD(Optimizer):
+  def __init__(self, lr=0.01):
+    super().__init__()
+    self.lr = lr
+
+  def update_one(self, param):
+    param.data -= self.lr * param.grad.data -> 여기서 -= 이 문법이 어떤 문법인지 궁금하다 
+
+from dezero import optimizers -> 회귀 문제 풀기
+SGD 클래스로 매개변수를 갱신 - optimizer.update()
+
+기울기를 이용한 최적화 기법
+- Momentum, AdaGrad, AdaDelta, Adam
+상수의 최적값이 0.9로 정해져있는 이유는 무엇인건가?
