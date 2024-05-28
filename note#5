@@ -28,3 +28,54 @@ SGD 클래스로 매개변수를 갱신 - optimizer.update()
 기울기를 이용한 최적화 기법
 - Momentum, AdaGrad, AdaDelta, Adam
 상수의 최적값이 0.9로 정해져있는 이유는 무엇인건가?
+
+다중 클래스 분류 코드(전반)
+하이퍼파라미터 설정 - 은닉층 수와 학습률
+데이터 셋을 읽고 모델과 옵티마이저를 생성
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+import dezero
+from dezero import optimizers
+import dezero.functions as F
+from dezero.models import MLP
+
+max_epoch = 300
+batch_size = 30
+hidden_size =  0
+lr = 1.0
+
+x, t = dezero.datasets.get_spiral(train=True)
+model = MLP(hidden_size, 3)
+optimizer = optimizers.SGD(lr).setup(model)
+
+다중 클래스 분류 코드(후반)
+np.random.permutation 함수를 사용하여 데이터 셋의 인덱스를 무작위로 섞음
+미니배치 생성
+기울기를 구하고 매개변수 생긴
+에포크마다 손실 함수 결과 출력
+
+데이터셋 전처리
+모델에 데이터를 입력하기 전에 데이터를 특정한 형태로 가공할 경우가 많음
+데이터 형상 변혀으 데이터 확장 등등
+초기화 시에 transform 과 target_transform을 새롭게 받음
+transform은 입력 데이터 하나에 대한 변환을 처리하고, target_transform 레이블 하나에 대한 변환을 처리함
+def f(x):
+  y = x / 2.0
+  return y
+
+train_set = dezero.datasets.Spiral(transform=f)
+
+seq2seq의 문제점
+Encoder의 출력은 고정 길이 벡터
+고정 길이 벡터는 입력 문장의 길이에 관계업이 항상 같은 길이의 벡터로 변환이 됨
+아무리 긴 문장이 입력되더라도 항상 똑같은 길이의 벡터에 밀어 넣음
+LSTM 계층의 마지막 은닉 상태만을 Decoder에 전달하고 Encoder의 출력 길이는 입력 문장에 따라 바꿔주도록 한다. 
+은닉 상태 벡터를 모두 이용하면 입력된 단어와 같은 수의 벡터를 얻는다. 
+
+단어들의 가중치를 구하는데 단어들의 얼라이먼트를 추출한다.
+각 시각에서 Decoder에 입력된 단어와 대응 관계인 단어의 벡터를 hs에서 선택하고 선택 작업을 어떤 계산으로 수행을 한다. -> 선택은 미분가능 하지 않으므로, 모든 것을 선택하여 미분을 가능하게 한다.
+
+가중치 a를 구할 때 벡터를 내적, 소프트맥스
+두 벡터의 유사도를 표현하는 내적을 이용해서 소프트맥스 함수를 이용해서 정규화를 한다.
+
